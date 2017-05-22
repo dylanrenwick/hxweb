@@ -11,12 +11,14 @@ class HttpServer {
     private var readSockets:Array<Socket>;
     private var buffer:Bytes;
     private var clients:Map<Socket, Connection>;
+    private var handler:IHttpHandler;
 
-    public function new() {
+    public function new(handler:IHttpHandler) {
         buffer = Bytes.alloc(8192);
         socket = new Socket();
         readSockets = [socket];
         clients = new Map<Socket, Connection>();
+        this.handler = handler;
     }
 
     public function start(host:Host, port:Int, maxConns:Int) {
@@ -49,7 +51,14 @@ class HttpServer {
                     bytesReceived = sckt.input.readBytes(buffer, 0, buffer.length);
                     if (bytesReceived > 0) {
                         trace('Bytes found');
-                        trace(parseRequest(buffer.getString(0, buffer.length).split('\n')));
+                        var request = parseRequest(buffer.getString(0, buffer.length).split('\n'));
+                        var code:Int = handler.handleRequest(request);
+                        if (clients[sckt].writeBytes(Bytes.ofString(request.httpVer + " " + code + " OK\n" + "Server: hxweb/v0.0.1\n" + "Content-Length: 88\n" + "Content-Type: text/html\n" + "Connection: Closed\n" + "<html>\n<body>\n<h1>Hello, World!</h1>\n</body>\n</html>"))) {
+                            trace("Response sent!");
+                        }
+                        else {
+                            trace("Response failed!");
+                        }
                     }
                     else {
                         //trace('No bytes found');
